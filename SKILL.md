@@ -2,7 +2,7 @@
 name: english-craft
 description: 英文语料工坊（EnglishCraft）。一站式英文原版语料策展、散装文章装订成册、词汇提炼分析、A4打印排版，并支持一键导入词塔（WordTower）生成双语伴读课程。支持《经济学人》等外刊、Standard Ebooks 与古登堡名著、AudioBook Bay 有声书、英文播客与免本地转录文稿提取、YouTube 英文字幕、外媒网页去噪长文。
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   homepage: "https://github.com/acoldfox/english-craft"
 ---
 
@@ -123,10 +123,10 @@ python3 {baseDir}/scripts/fetch_youtube.py list @TEDEd -n 5 [--markdown] [--json
 # 便捷简写（直接跟 Handle 或用户名）
 python3 {baseDir}/scripts/fetch_youtube.py @hubermanlab -n 3
 
-# 下载指定视频的英文时间戳字幕（.srt）
-python3 {baseDir}/scripts/fetch_youtube.py subtitles "https://www.youtube.com/watch?v=aDblEBU41nA" -o ./downloads/subtitles
+# 下载指定视频的英文时间戳字幕（默认 .srt；可用 --format json3 获取原始逐词时间戳字幕）
+python3 {baseDir}/scripts/fetch_youtube.py subtitles "https://www.youtube.com/watch?v=aDblEBU41nA" -o ./downloads/subtitles [--format json3]
 
-# 一键将指定 YouTube 视频提取字幕并导入词塔生成双语阅读伴读课程
+# 一键将指定 YouTube 视频提取字幕（优先 .json3 以保留逐词时间戳）并导入词塔生成双语阅读伴读课程
 python3 {baseDir}/scripts/fetch_youtube.py wordtower "https://www.youtube.com/watch?v=aDblEBU41nA" [--title "Pepper History"]
 ```
 
@@ -148,7 +148,7 @@ python3 {baseDir}/scripts/fetch_podcast.py transcript "Huberman Lab" -e "Cold & 
 
 > [!IMPORTANT]
 > **播客导入词塔（WordTower）的能力边界：**
-> 词塔官方 Skill（`v0.7.0`）仅支持导入 **纯文本、EPUB 和 YouTube 视频**，**不支持直接上传 MP3 播客音频或绑定播客 RSS 流**。
+> 词塔官方 Skill（`v0.7.3+`）仅支持导入 **纯文本、EPUB 和 YouTube 视频**，**不支持直接上传 MP3 播客音频或绑定播客 RSS 流**。
 > 若用户明确要求将某期播客“导入词塔”，Agent **必须先如实告知这一限制并等待用户二选一确认**，绝不静默降级：
 > 1. 若提取结果包含官方同源 YouTube 链接（`youtube_url`）：告知用户“词塔不支持直接导入 MP3 播客，但已匹配到官方同源 YouTube 视频版”，经确认后调用 `exporters/wordtower.py youtube` 按 **YouTube 视频课程** 导入；
 > 2. 若无同源 YouTube 视频：告知用户“仅可将提取出的 `.md` 文字逐字稿作为**无音频的纯文本阅读课**导入”，经确认后再调用 `exporters/wordtower.py text`。
@@ -177,7 +177,7 @@ python3 {baseDir}/scripts/print_layout.py <path-to-md-or-epub> --title "Article 
 ```
 
 ### 9. 导出到词塔 (`{baseDir}/scripts/exporters/wordtower.py`)
-完整实现词塔官方 v0.7.0 的 `Preview ➔ Submit (UUID 幂等键) ➔ Poll Status` 三步闭环（若用户仅要求预览，可附加 `--preview-only`）：
+完整实现词塔官方 `v0.7.3+` 的 `Preview ➔ Submit (UUID 幂等键) ➔ Poll Status` 三步闭环（若用户仅要求预览，可附加 `--preview-only`）：
 ```bash
 # 导出 EPUB（若用户仅需特定章节，先调用 wordtower/scripts/epub_select.py inspect & build 裁剪后再导出）
 python3 {baseDir}/scripts/exporters/wordtower.py epub <path-to-epub> --title "<课程名>"
@@ -185,12 +185,12 @@ python3 {baseDir}/scripts/exporters/wordtower.py epub <path-to-epub> --title "<�
 # 导出 Markdown/文本
 python3 {baseDir}/scripts/exporters/wordtower.py text <path-to-md> --title "<课程名>"
 
-# 导出带时间戳字幕的 YouTube 视频课程（支持原生一行命令建课，无需 Node/Bun）
+# 导出带时间戳字幕的 YouTube 视频课程（自动优先抓取 .json3 以保留单词级时间戳，无需 Node/Bun）
 python3 {baseDir}/scripts/fetch_youtube.py wordtower "<YouTube-URL>" [--title "<课程名>"]
 
-# 或分步执行字幕下载与导出：
-python3 {baseDir}/scripts/fetch_youtube.py subtitles "<YouTube-URL>" -o ./downloads/subtitles
-python3 {baseDir}/scripts/exporters/wordtower.py youtube "<YouTube-URL>" --subtitles ./downloads/subtitles/<video-id>.en.srt --title "<课程名>"
+# 或分步执行字幕下载与导出（推荐 --format json3；也支持 .srt / .vtt / .json）：
+python3 {baseDir}/scripts/fetch_youtube.py subtitles "<YouTube-URL>" --format json3 -o ./downloads/subtitles
+python3 {baseDir}/scripts/exporters/wordtower.py youtube "<YouTube-URL>" --subtitles ./downloads/subtitles/<video-id>.en.json3 --title "<课程名>"
 ```
 
 ---
@@ -243,9 +243,10 @@ python3 {baseDir}/scripts/exporters/wordtower.py youtube "<YouTube-URL>" --subti
 
 ### YouTube 同步字幕导入词塔时的执行约束（仅在用户要求导出到词塔时适用，非安装期要求）
 
-- 视频课程必须使用 `wordtower.py youtube URL --subtitles FILE`，字幕只接受带真实起止时间的 SRT/VTT 或官方 timed JSON。不得把字幕转 Markdown 后用 `text` 导入，也不得在字幕获取失败时降级成纯文本建课。
-- 正文只含字幕，不插入视频标题、简介、总结或翻译；这些内容会破坏字幕与正文的对应关系。标题通过 `--title` 指定。
-- 提交前脚本必须验证服务端预览的 `media_type=youtube`、`source_url` 和正数 `subtitle_count`；不满足即停止，不提交课程。
-- 找不到最新版官方技能时，可设置 `WORDTOWER_REQUEST_SCRIPT=/absolute/path/wordtower/scripts/request.py`。该脚本须与同包 `config.json` 配套，并支持 `--youtube`、`--subtitles` 与当前 Token 协议。不要修改 API 地址或降级使用旧技能。
-- SRT 提供字幕片段级时间轴，与 App 的句子级高亮能力一致；它不包含真实逐词对齐，不得伪造均分单词时间。
-- 已经以纯文本导入的历史课程不会被自动修复；应重新使用原始时间字幕导入，不从正文猜测时间戳。
+- 视频课程必须使用 `wordtower.py youtube URL --subtitles FILE`，字幕只接受带真实起止时间的 `JSON3`、SRT、VTT 或官方 timed JSON。不得把字幕转 Markdown 后用 `text` 导入，也不得在字幕获取失败时降级成纯文本建课。
+- 导入词塔时应优先抓取原始 YouTube `json3` 字幕（保留 `events[].segs[].tOffsetMs`），再由新版词塔 `request.py` 直接解析生成单词级时间戳，不得先转成 SRT/VTT 丢弃词偏移。
+- 正文只含字幕，不插入视频标题、简介、总结或翻译；这些内容会破坏字幕与正文的对应关系。标题通过 `--title` 指定（`fetch_youtube.py wordtower` 未指定时默认取原视频标题）。
+- 提交前脚本必须验证服务端预览的 `media_type=youtube`、`source_url` 和正数 `subtitle_count`；不满足即停止，不提交课程。同时根据服务端返回的 `word_timing_count` 如实告知用户是否具备逐词同步（`> 0` 为逐词边界，`0` 为仅段落/句子级时间）。
+- 找不到最新版官方技能时，可设置 `WORDTOWER_REQUEST_SCRIPT=/absolute/path/wordtower/scripts/request.py`。该脚本须与同包 `config.json` 配套，并支持 `--youtube`、`--subtitles`（含 `.json3`）与当前 Token 协议。不要修改 API 地址或降级使用旧技能。
+- 若源文件仅提供 SRT/VTT 或无 `tOffsetMs` 的字幕轨道，只做句子/片段级同步，不得伪造均分单词时间。
+- 已经以纯文本或旧版句子级导入的历史课程不会被自动修复；应重新使用原始带时间字幕（优先 `json3`）导入，不从正文猜测时间戳。

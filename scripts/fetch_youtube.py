@@ -15,6 +15,8 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -255,65 +257,280 @@ def fetch_channel_videos(
     }
 
 
+def extract_video_id(video_url_or_id: str) -> str | None:
+    """Extract a YouTube video ID from a URL or bare ID."""
+    raw = video_url_or_id.strip()
+    if not raw:
+        return None
+    if not raw.startswith(("http://", "https://")):
+        return raw if re.fullmatch(r"[A-Za-z0-9_-]{6,}", raw) else None
+
+    parsed = urllib.parse.urlsplit(raw)
+    host = (parsed.hostname or "").lower()
+    if host == "youtu.be":
+        seg = parsed.path.strip("/").split("/")[0]
+        return seg or None
+    if "youtube.com" in host or "youtube-nocookie.com" in host:
+        qs = urllib.parse.parse_qs(parsed.query)
+        if qs.get("v"):
+            return qs["v"][0]
+        parts = [p for p in parsed.path.split("/") if p]
+        if len(parts) >= 2 and parts[0] in {"shorts", "embed", "live", "v"}:
+            return parts[1]
+    return None
+
+
+def canonical_video_url(video_url_or_id: str) -> tuple[str, str]:
+    """Return (canonical watch URL, safe filename ID) for a YouTube video."""
+    vid_id = extract_video_id(video_url_or_id)
+    if vid_id:
+        return f"https://www.youtube.com/watch?v={vid_id}", vid_id
+    return video_url_or_id.strip(), "youtube_sub"
+
+
+def _parse_format_priority(sub_format: str) -> list[str]:
+    """Parse comma- or slash-separated subtitle format preferences."""
+    tokens = [tok.strip().lower() for tok in re.split(r"[,/]+", sub_format or "srt") if tok.strip()]
+    ordered: list[str] = []
+    for tok in tokens:
+        if tok not in ordered:
+            ordered.append(tok)
+    return ordered or ["srt"]
+
+
+def _fetch_video_metadata(
+    ytdlp_cmd: list[str],
+    vid_url: str,
+    proxy: str | None = None,
+) -> dict[str, Any] | None:
+    """Fetch full yt-dlp metadata JSON for a single video."""
+    cmd = ytdlp_cmd + [
+        "--no-warnings",
+        "--no-update",
+        "--skip-download",
+        "-J",
+        vid_url,
+    ]
+    if proxy:
+        cmd.extend(["--proxy", proxy])
+    try:
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+        )
+        data = json.loads(res.stdout)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _is_translated_track(track_url: str) -> bool:
+    """Return True when a YouTube timedtext URL uses machine translation (tlang=)."""
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(track_url).query)
+    return "tlang" in query
+
+
+def _expand_lang_candidates(lang: str) -> list[str]:
+    """Expand requested languages while preserving user priority order."""
+    raw_langs = [item.strip() for item in (lang or "en").split(",") if item.strip()]
+    expanded: list[str] = []
+    for item in raw_langs:
+        if item not in expanded:
+            expanded.append(item)
+        if "-" not in item and f"{item}-orig" not in expanded:
+            expanded.append(f"{item}-orig")
+    return expanded or ["en", "en-orig"]
+
+
+def _iter_track_candidates(
+    metadata: dict[str, Any],
+    langs: list[str],
+    formats: list[str],
+) -> list[tuple[str, str, str]]:
+    """
+    Collect ordered (lang, ext, url) subtitle candidates from yt-dlp metadata.
+    Prioritizes manual subtitles over auto captions, and non-translated tracks
+    (without tlang=) over translated tracks to avoid rate limits and drift.
+    """
+    buckets = [
+        metadata.get("subtitles") or {},
+        metadata.get("automatic_captions") or {},
+    ]
+    primary: list[tuple[str, str, str]] = []
+    translated: list[tuple[str, str, str]] = []
+
+    for bucket in buckets:
+        if not isinstance(bucket, dict):
+            continue
+        for req_lang in langs:
+            tracks = bucket.get(req_lang)
+            if not isinstance(tracks, list):
+                continue
+            for fmt in formats:
+                for track in tracks:
+                    if not isinstance(track, dict):
+                        continue
+                    if (track.get("ext") or "").lower() != fmt:
+                        continue
+                    url = track.get("url")
+                    if not url:
+                        continue
+                    item = (req_lang, fmt, url)
+                    if _is_translated_track(url):
+                        translated.append(item)
+                    else:
+                        primary.append(item)
+
+    return primary + translated
+
+
+def _download_track_url(
+    url: str,
+    dest_path: Path,
+    fmt: str,
+    proxy: str | None = None,
+) -> bool:
+    """Download and validate a single subtitle track URL."""
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept-Language": "en-US,en;q=0.9",
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+            ),
+        },
+    )
+    handlers = [urllib.request.ProxyHandler({"http": proxy, "https": proxy})] if proxy else []
+    opener = urllib.request.build_opener(*handlers)
+    try:
+        with opener.open(req, timeout=20) as resp:
+            raw = resp.read()
+    except Exception:
+        return False
+
+    text = raw.decode("utf-8", errors="replace")
+    if not text.strip():
+        return False
+    if fmt == "json3":
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(parsed, dict) or not isinstance(parsed.get("events"), list) or not parsed["events"]:
+            return False
+
+    dest_path.write_bytes(raw)
+    return True
+
+
+def _pick_downloaded_subtitle(
+    out_folder: Path,
+    safe_id: str,
+    formats: list[str],
+) -> Path | None:
+    """Select the highest-priority downloaded subtitle file matching format preference."""
+    for fmt in formats:
+        candidates = list(out_folder.glob(f"{safe_id}*.{fmt}"))
+        if candidates:
+            candidates.sort(key=lambda p: (len(p.name), p.name))
+            return candidates[0]
+    return None
+
+
+def download_subtitles_with_meta(
+    video_url_or_id: str,
+    output_dir: str | Path | None = None,
+    lang: str = "en,en-US,en-GB",
+    proxy: str | None = None,
+    sub_format: str = "srt",
+) -> tuple[Path, dict[str, Any]]:
+    """
+    Download subtitles for a YouTube video in the preferred format order
+    (e.g. 'srt' or 'json3,vtt,srt') and return (subtitle_path, video_meta).
+    """
+    ytdlp_cmd = get_ytdlp_command()
+    vid_url, safe_id = canonical_video_url(video_url_or_id)
+    formats = _parse_format_priority(sub_format)
+    langs = _expand_lang_candidates(lang)
+
+    out_folder = Path(output_dir or "./transcripts").resolve()
+    out_folder.mkdir(parents=True, exist_ok=True)
+
+    metadata = _fetch_video_metadata(ytdlp_cmd, vid_url, proxy=proxy)
+    video_meta = {
+        "video_id": safe_id,
+        "video_url": vid_url,
+        "title": (metadata or {}).get("title"),
+    }
+
+    if metadata:
+        for track_lang, fmt, track_url in _iter_track_candidates(metadata, langs, formats):
+            clean_lang = re.sub(r"[^A-Za-z0-9_-]+", "_", track_lang.removesuffix("-orig")) or "en"
+            dest_path = out_folder / f"{safe_id}.{clean_lang}.{fmt}"
+            if _download_track_url(track_url, dest_path, fmt, proxy=proxy):
+                return dest_path, video_meta
+
+    # Fallback: let yt-dlp write subtitles directly (try first explicit lang to avoid mass tlang 429s)
+    out_template = str(out_folder / f"{safe_id}.%(ext)s")
+    fmt_arg = "/".join(formats)
+    fallback_langs = [lang, langs[0]] if "," in lang else [lang]
+    last_err = ""
+    for lang_arg in fallback_langs:
+        cmd = (
+            ytdlp_cmd
+            + [
+                "--write-sub",
+                "--write-auto-sub",
+                "--sub-lang",
+                lang_arg,
+                "--sub-format",
+                fmt_arg,
+                "--skip-download",
+                "--no-warnings",
+                "--no-update",
+                "-o",
+                out_template,
+                vid_url,
+            ]
+        )
+        if proxy:
+            cmd.extend(["--proxy", proxy])
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        found = _pick_downloaded_subtitle(out_folder, safe_id, formats)
+        if found is not None:
+            return found, video_meta
+        last_err = (res.stderr or "").strip() or (res.stdout or "").strip()
+
+    if last_err:
+        raise RuntimeError(f"Failed to download subtitles: {last_err}")
+    raise FileNotFoundError(f"No subtitle file was generated in {out_folder}")
+
+
 def download_subtitles(
     video_url_or_id: str,
     output_dir: str | Path | None = None,
     lang: str = "en,en-US,en-GB",
     proxy: str | None = None,
+    sub_format: str = "srt",
 ) -> Path:
-    """Download English subtitles for a video and return the .srt path."""
-    ytdlp_cmd = get_ytdlp_command()
-
-    if video_url_or_id.startswith("http://") or video_url_or_id.startswith("https://"):
-        vid_url = video_url_or_id
-        vid_id = re.search(r"[?&]v=([^&]+)", vid_url)
-        safe_id = vid_id.group(1) if vid_id else "youtube_sub"
-    else:
-        safe_id = video_url_or_id.strip()
-        vid_url = f"https://www.youtube.com/watch?v={safe_id}"
-
-    out_folder = Path(output_dir or "./transcripts").resolve()
-    out_folder.mkdir(parents=True, exist_ok=True)
-    out_template = str(out_folder / f"{safe_id}.%(ext)s")
-
-    cmd = (
-        ytdlp_cmd
-        + [
-            "--write-sub",
-            "--write-auto-sub",
-            "--sub-lang",
-            lang,
-            "--sub-format",
-            "srt",
-            "--skip-download",
-            "--no-warnings",
-            "--no-update",
-            "-o",
-            out_template,
-            vid_url,
-        ]
+    """Download English subtitles for a video and return the subtitle file path."""
+    sub_path, _ = download_subtitles_with_meta(
+        video_url_or_id,
+        output_dir=output_dir,
+        lang=lang,
+        proxy=proxy,
+        sub_format=sub_format,
     )
-
-    if proxy:
-        cmd.extend(["--proxy", proxy])
-
-    res = subprocess.run(
-        cmd,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    if res.returncode != 0:
-        err = (res.stderr or "").strip() or (res.stdout or "").strip()
-        raise RuntimeError(f"Failed to download subtitles: {err}")
-
-    srt_candidates = list(out_folder.glob(f"{safe_id}*.srt"))
-    if not srt_candidates:
-        raise FileNotFoundError(f"No subtitle file was generated in {out_folder}")
-
-    # Prefer direct exact language match if available
-    srt_candidates.sort(key=lambda p: len(p.name))
-    return srt_candidates[0]
+    return sub_path
 
 
 def print_human_table(result: dict[str, Any], show_covers: bool = False):
@@ -382,8 +599,13 @@ def main():
     # subtitles subcommand
     sub_parser = subparsers.add_parser("subtitles", help="Download subtitles for a YouTube video")
     sub_parser.add_argument("video", help="YouTube video URL or Video ID")
-    sub_parser.add_argument("-o", "--output-dir", default="./transcripts", help="Directory to save .srt file")
+    sub_parser.add_argument("-o", "--output-dir", default="./transcripts", help="Directory to save subtitle file")
     sub_parser.add_argument("--lang", default="en,en-US,en-GB", help="Subtitle language (default: en,en-US,en-GB)")
+    sub_parser.add_argument(
+        "--format",
+        default="srt",
+        help="Subtitle format or priority list, e.g. srt, vtt, json3, or json3,vtt,srt (default: srt)",
+    )
     sub_parser.add_argument("--proxy", help="HTTP/HTTPS proxy")
     sub_parser.add_argument("--json", action="store_true", help="Output result as JSON")
 
@@ -391,6 +613,13 @@ def main():
     wt_parser = subparsers.add_parser("wordtower", help="Download subtitles and import video into WordTower")
     wt_parser.add_argument("video", help="YouTube video URL or Video ID")
     wt_parser.add_argument("-t", "--title", help="Course title for WordTower (defaults to video title)")
+    wt_parser.add_argument("-o", "--output-dir", default="./transcripts", help="Directory to save subtitle file")
+    wt_parser.add_argument("--lang", default="en,en-US,en-GB", help="Subtitle language (default: en,en-US,en-GB)")
+    wt_parser.add_argument(
+        "--format",
+        default="json3,vtt,srt",
+        help="Subtitle format priority for WordTower import (default: json3,vtt,srt)",
+    )
     wt_parser.add_argument("--preview-only", action="store_true", help="Preview only on WordTower without submit")
     wt_parser.add_argument("--proxy", help="HTTP/HTTPS proxy")
 
@@ -417,30 +646,38 @@ def main():
 
     elif args.subcommand == "subtitles":
         try:
-            srt_path = download_subtitles(
+            sub_path = download_subtitles(
                 video_url_or_id=args.video,
                 output_dir=args.output_dir,
                 lang=args.lang,
                 proxy=args.proxy,
+                sub_format=args.format,
             )
             if args.json:
                 print(json.dumps({
                     "status": "success",
                     "video": args.video,
-                    "subtitles_path": str(srt_path),
+                    "format": sub_path.suffix.lstrip("."),
+                    "subtitles_path": str(sub_path),
                 }, indent=2))
             else:
-                print(f"\n✅ Subtitles saved to: {srt_path}\n")
+                print(f"\n✅ Subtitles saved to: {sub_path}\n")
         except Exception as exc:
             print(f"\n❌ Error downloading subtitles: {exc}\n", file=sys.stderr)
             sys.exit(1)
 
     elif args.subcommand == "wordtower":
-        # First download subtitle
+        # Prefer JSON3 subtitles so WordTower preserves word-level timestamps when available
         try:
-            print(f"📥 Downloading subtitles for {args.video} ...")
-            srt_path = download_subtitles(args.video, proxy=args.proxy)
-            print(f"✓ Subtitles downloaded: {srt_path}")
+            print(f"📥 Downloading subtitles ({args.format}) for {args.video} ...")
+            sub_path, video_meta = download_subtitles_with_meta(
+                args.video,
+                output_dir=args.output_dir,
+                lang=args.lang,
+                proxy=args.proxy,
+                sub_format=args.format,
+            )
+            print(f"✓ Subtitles downloaded: {sub_path}")
         except Exception as exc:
             print(f"❌ Failed to download subtitles: {exc}", file=sys.stderr)
             sys.exit(1)
@@ -451,17 +688,18 @@ def main():
             print(f"❌ exporters/wordtower.py not found at {exporter_script}", file=sys.stderr)
             sys.exit(1)
 
-        vid_url = args.video if args.video.startswith("http") else f"https://www.youtube.com/watch?v={args.video}"
+        vid_url = video_meta.get("video_url") or canonical_video_url(args.video)[0]
+        course_title = args.title or video_meta.get("title")
         cmd = [
             sys.executable,
             str(exporter_script),
             "youtube",
             vid_url,
             "--subtitles",
-            str(srt_path),
+            str(sub_path),
         ]
-        if args.title:
-            cmd.extend(["--title", args.title])
+        if course_title:
+            cmd.extend(["--title", course_title])
         if args.preview_only:
             cmd.append("--preview-only")
 

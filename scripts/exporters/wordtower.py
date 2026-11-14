@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 WordTower Exporter for EnglishCraft
-Bridges processed English corpus (EPUB, Text, YouTube transcripts) into WordTower (v0.7.0).
+Bridges processed English corpus (EPUB, Text, YouTube transcripts) into WordTower (v0.7.3+).
 Implements the complete official 3-step protocol:
   1. Preview (/imports/epub/preview, /imports/preview, or /imports/youtube/preview)
   2. Submit  (/imports/epub or /imports/text with preview_id + idempotency_key)
@@ -36,13 +36,17 @@ def find_wordtower_request_script():
                  "~/.gemini/config/skills", "~/.gemini/antigravity/skills",
                  "~/.workbuddy/skills", ".workbuddy/skills"):
         candidates.append(os.path.expanduser(root + "/wordtower/scripts/request.py"))
+    legacy_match = None
     for candidate in candidates:
         if os.path.isfile(candidate):
             # Older installations support only text import and legacy credentials.
             source = Path(candidate).read_text(encoding="utf-8")
             if "--subtitles" in source and "WORDTOWER_API_KEY" in source:
-                return candidate
-    return None
+                if ".json3" in source:
+                    return candidate
+                if legacy_match is None:
+                    legacy_match = candidate
+    return legacy_match
 
 
 def prepare_env():
@@ -113,6 +117,7 @@ def submit_and_poll(script_path, preview_resp, submit_api, env, preview_only=Fal
     norm_chars = data.get("normalized_chars", 0)
     chapters = data.get("chapter_count") or data.get("chapters")
     subtitles = data.get("subtitle_count")
+    word_timings = data.get("word_timing_count")
 
     print(f"✓ Preview generated (preview_id: {preview_id})")
     print(f"  Title: {title} | Normalized Chars: {norm_chars:,}", end="")
@@ -120,6 +125,8 @@ def submit_and_poll(script_path, preview_resp, submit_api, env, preview_only=Fal
         print(f" | Chapters: {chapters}", end="")
     if subtitles:
         print(f" | Subtitles: {subtitles}", end="")
+    if isinstance(word_timings, int) and not isinstance(word_timings, bool):
+        print(f" | Word Timings: {word_timings}", end="")
     print()
 
     if preview_only:
@@ -169,6 +176,13 @@ def submit_and_poll(script_path, preview_resp, submit_api, env, preview_only=Fal
                 print(f"   Billed Chars:       {s_data.get('billed_chars'):,}")
             if s_data.get("reader_link"):
                 print(f"   Reader Link:        {s_data.get('reader_link')}")
+            for ch in s_data.get("chapters") or []:
+                if not isinstance(ch, dict):
+                    continue
+                if ch.get("course_id"):
+                    print(f"   Course ID:          {ch.get('course_id')}")
+                if ch.get("reader_link") and ch.get("reader_link") != s_data.get("reader_link"):
+                    print(f"   Reader Link:        {ch.get('reader_link')}")
             return
         elif status in ("failed", "cancelled"):
             print(f"\n✗ Import {status} (job_id: {job_id}):", file=sys.stderr)
@@ -227,7 +241,7 @@ def export_text(text_path, title=None, preview_only=False):
         sys.exit(1)
 
     content = Path(text_path).read_text(encoding="utf-8-sig")
-    if Path(text_path).suffix.lower() in {".srt", ".vtt"} or re.search(
+    if Path(text_path).suffix.lower() in {".srt", ".vtt", ".json3"} or re.search(
         r"^\s*\d{2}:\d{2}.*-->", content, re.MULTILINE
     ):
         raise ValueError("Timed/video transcripts must use youtube URL --subtitles FILE; text import cannot retain playback timing")
@@ -252,9 +266,13 @@ def validate_youtube_preview(response, youtube_url):
             or not isinstance(count, int) or isinstance(count, bool) or count <= 0
             or not data.get("preview_id")):
         raise RuntimeError("YouTube preview lacks a verified subtitle timeline; import stopped. "
-                           "Use timed SRT/VTT/JSON and update the official WordTower skill/server. "
+                           "Use timed JSON3/SRT/VTT/JSON and update the official WordTower skill/server. "
                            "Do not fall back to text import.")
-    print(f"✓ Verified YouTube sentence timeline: {count} timed cues")
+    word_timings = data.get("word_timing_count")
+    if isinstance(word_timings, int) and not isinstance(word_timings, bool) and word_timings > 0:
+        print(f"✓ Verified YouTube word-level timeline: {count} timed cues, {word_timings} word timings")
+    else:
+        print(f"✓ Verified YouTube sentence timeline: {count} timed cues (segment-level only; no word-level timings)")
 
 
 def export_youtube(youtube_url, subtitles_path, title=None, preview_only=False):
@@ -267,6 +285,13 @@ def export_youtube(youtube_url, subtitles_path, title=None, preview_only=False):
     if not os.path.exists(subtitles_path):
         print(f"Error: Subtitles file not found: {subtitles_path}", file=sys.stderr)
         sys.exit(1)
+
+    if Path(subtitles_path).suffix.lower() == ".json3" and os.path.isfile(script_path):
+        if ".json3" not in Path(script_path).read_text(encoding="utf-8"):
+            raise RuntimeError(
+                "Installed WordTower request.py does not support .json3 word-level subtitles. "
+                "Update the official WordTower skill (npx skills add https://github.com/word-tower/skills --skill wordtower -y)."
+            )
 
     vid_title = title or os.path.splitext(os.path.basename(subtitles_path))[0] or "YouTube Video Lesson"
     cmd = [
@@ -309,7 +334,7 @@ def main():
     # youtube
     yt_parser = subparsers.add_parser("youtube", help="Export YouTube video & subtitles to WordTower")
     yt_parser.add_argument("url", help="YouTube video URL")
-    yt_parser.add_argument("--subtitles", "-s", required=True, help="Path to .srt / .vtt / .json subtitles")
+    yt_parser.add_argument("--subtitles", "-s", required=True, help="Path to .json3 / .srt / .vtt / .json subtitles")
     yt_parser.add_argument("--title", "-t", help="Course title")
     yt_parser.add_argument("--preview-only", action="store_true", help="Only generate preview without submitting")
 

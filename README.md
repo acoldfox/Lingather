@@ -34,7 +34,7 @@
   - **公版经典名著**：优先检索 **Standard Ebooks** 极客精排源，自动 fallback 至 **Project Gutenberg**（古登堡计划），支持书名、作者、数字 ID 与 URL 直下。
   - **英文有声读物**：支持 **AudioBook Bay (ABB)** 无删减有声书检索（含演播者、M4B/MP3 格式与码率解析），基于 Info Hash 与 Tracker 列表**免登录直接生成磁力链接 (Magnet Link)**。
   - **英文精品播客**：基于 Apple iTunes 免 Key 检索播客与单集，并通过 RSS `<podcast:transcript>` 与 YouTube 同源字幕映射实现**零本地 ASR 转录**的逐字稿提取。
-  - **现代多模态**：支持 YouTube 英文频道检索与带时间戳字幕（SRT）采集，支持任意网页外媒长文去噪正文提取。
+  - **现代多模态**：支持 YouTube 英文频道检索与带时间戳字幕（SRT / JSON3）采集，支持任意网页外媒长文去噪正文提取。
 - 📚 **散装文章装订成册 (Bind)**
   - 内置 EPUB 3 零依赖打包引擎，将多篇散落的 Markdown / TXT 文章或章节，一键编译成标准的 EPUB 电子书，生成合规目录（TOC），直接推送到 Kindle 或 Apple Books。
 - 📊 **词频与核心生词提炼 (Vocab)**
@@ -45,7 +45,7 @@
   - 生成专为打印设计的 A4 HTML 页面：**左侧正文 + 右侧边栏生词与手写批注线 + 文末生词复习打卡清单**。
   - 浏览器按 `Cmd + P` / `Ctrl + P` 即可一键输出高颜值 A4 打印纸或保存为 PDF。
 - 🗼 **生态对接：词塔导出适配 (Export to WordTower)**
-  - 支持将文本、EPUB 与 YouTube 视频（含带时间戳字幕）一键推送到 [词塔（WordTower）](https://www.wordtower.cn) 生成双语伴读课程（暂不支持直接上传有声书或 MP3 播客音频；播客可导出其纯文字稿或选择官方同源 YouTube 视频版导入）。
+  - 采集或装订的任意语料，均可一键推送到 [词塔（WordTower）](https://www.wordtower.cn) 生成双语伴读课程，保留原视频时间轴、逐句点读与（基于原始 `json3` 字幕的）单词级同步高亮功能。
 
 ---
 
@@ -89,7 +89,7 @@ npx skills add https://github.com/acoldfox/english-craft -y
 - *“生成打印排版，文末要带打卡复习勾选框清单。”*
 
 #### 🗼 5. 词塔（WordTower）专属双语伴读与互动课程
-EnglishCraft 深度集成了 [词塔（WordTower）](https://www.wordtower.cn)，支持将文本、EPUB 与 YouTube 视频一键转为具备句子点读、生词联想与视频同步播放的精读课（注：词塔暂不支持直接上传有声书或 MP3 播客音频）：
+EnglishCraft 深度集成了 [词塔（WordTower）](https://www.wordtower.cn)，采集或装订的语料均可一键转为具备句子点读、生词联想与视频同步播放的精读课：
 - **YouTube 视频原声伴读**：
   - *“把这个 TED 英文演讲导入词塔，保留播放器与原声时间轴做成精读课程：https://youtube.com/watch?v=xxx”*
   - *“帮我把这个油管科技博主的视频和字幕提取出来，一键同步到词塔跟读打卡。”*
