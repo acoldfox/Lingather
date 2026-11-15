@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Vocabulary Analyzer & Extractor for Lingather
+Vocabulary Analyzer & Extractor for EngCraft
 Extracts, lemmatizes, ranks, and analyzes study-worthy English vocabulary from EPUB, Text, Markdown, or SRT files.
 Filters out basic A1/A2 stop words, proper nouns, and URLs, providing frequency statistics and context sentences.
 """
@@ -426,7 +426,7 @@ def format_output(stats, output_format="table"):
     return "\n".join(md)
 
 def main():
-    parser = argparse.ArgumentParser(description="Lingather Vocabulary Extractor & Analyzer")
+    parser = argparse.ArgumentParser(description="EngCraft Vocabulary Extractor & Analyzer")
     parser.add_argument("file", help="Path to EPUB, Markdown, TXT, HTML, or SRT file")
     parser.add_argument("--top", "-n", type=int, default=30, help="Number of top words to extract (default: 30)")
     parser.add_argument("--min-freq", "-m", type=int, default=2, help="Minimum occurrences (default: 2)")

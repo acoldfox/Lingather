@@ -1,4 +1,4 @@
-# 拾英语 (Lingather)
+# 英语工坊 (EngCraft)
 
 <p align="center">
   <strong>一站式英文原版语料策展、散装文章装订成册、词汇提炼分析与 A4 打印排版工坊</strong><br>
@@ -14,7 +14,7 @@
 
 ---
 
-## 📖 为什么需要 Lingather？
+## 📖 为什么需要 EngCraft？
 
 在日常学习英文、精读原版时，英语学习者常面临以下困扰：
 
@@ -23,7 +23,7 @@
 3. **散篇好文无处安放**：在网上收藏了多篇优秀外媒专栏或博文，散落在不同文件夹，无法装订成合集推送到墨水屏或阅读器。
 4. **纸质阅读排版差**：直接网页打印字号拥挤，没有留白，没有边栏生词批注区。
 
-**Lingather** 专为解决上述痛点而设计。它既是一个**功能完整的命令行工具集**，也是一个**开箱即用的 AI Agent 专属技能 (Skill)**。
+**EngCraft** 专为解决上述痛点而设计。它既是一个**功能完整的命令行工具集**，也是一个**开箱即用的 AI Agent 专属技能 (Skill)**。
 
 ---
 
@@ -57,9 +57,9 @@
 
 在你的 AI 客户端或工作区中安装本技能：
 ```bash
-npx skills add https://github.com/acoldfox/lingather --skill lingather -y
+npx skills add https://github.com/acoldfox/EngCraft --skill eng-craft -y
 ```
-*(或将本仓库克隆至你的 Agent 技能目录，如 `.agents/skills/lingather`)*
+*(或将本仓库克隆至你的 Agent 技能目录，如 `.agents/skills/eng-craft`)*
 
 ---
 
@@ -89,7 +89,7 @@ npx skills add https://github.com/acoldfox/lingather --skill lingather -y
 - *“生成打印排版，文末要带打卡复习勾选框清单。”*
 
 #### 🗼 5. 词塔（WordTower）专属双语伴读与互动课程
-Lingather 深度集成了 [词塔（WordTower）](https://www.wordtower.cn)，采集或装订的语料均可一键转为具备句子点读、生词联想与视频同步播放的精读课：
+EngCraft 深度集成了 [词塔（WordTower）](https://www.wordtower.cn)，采集或装订的语料均可一键转为具备句子点读、生词联想与视频同步播放的精读课：
 - **YouTube 视频原声伴读**：
   - *“把这个 TED 英文演讲导入词塔，保留播放器与原声时间轴做成精读课程：https://youtube.com/watch?v=xxx”*
   - *“帮我把这个油管科技博主的视频和字幕提取出来，一键同步到词塔跟读打卡。”*
@@ -108,7 +108,7 @@ Lingather 深度集成了 [词塔（WordTower）](https://www.wordtower.cn)，�
 ## 📂 项目结构
 
 ```text
-lingather/
+eng-craft/
 ├── SKILL.md                   # Agent Skill 规范定义与自动化编排
 ├── README.md                  # 项目使用指南与设计文档
 ├── scripts/
