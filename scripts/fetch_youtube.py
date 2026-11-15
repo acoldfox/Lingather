@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YouTube Channel & Video Extractor for EnglishCraft
+YouTube Channel & Video Extractor for Lingather
 Cross-platform (Windows, macOS, Linux) YouTube extractor leveraging yt-dlp.
 Supports auto-installing yt-dlp, fetching video lists with covers, extracting subtitles,
 and seamlessly exporting to WordTower (词塔) and vocab pipelines.
@@ -89,13 +89,13 @@ def get_ytdlp_command(auto_install: bool = True) -> list[str]:
 
     # 5. Not found - Attempt automatic self-healing installation
     if auto_install:
-        print("\n🔧 [EnglishCraft] 'yt-dlp' is required but not found.", file=sys.stderr)
+        print("\n🔧 [Lingather] 'yt-dlp' is required but not found.", file=sys.stderr)
         print("   Attempting automatic installation via pip ...", file=sys.stderr)
         try:
             install_cmd = [sys.executable, "-m", "pip", "install", "-U", "yt-dlp"]
             install_res = subprocess.run(install_cmd, check=False)
             if install_res.returncode == 0:
-                print("✅ [EnglishCraft] 'yt-dlp' successfully installed!\n", file=sys.stderr)
+                print("✅ [Lingather] 'yt-dlp' successfully installed!\n", file=sys.stderr)
                 # Re-check via module or PATH
                 found = shutil.which("yt-dlp")
                 if found:
@@ -108,7 +108,7 @@ def get_ytdlp_command(auto_install: bool = True) -> list[str]:
 
     # 6. Failure guidance
     print(
-        "\n❌ [EnglishCraft YouTube] Error: 'yt-dlp' is not available.\n"
+        "\n❌ [Lingather YouTube] Error: 'yt-dlp' is not available.\n"
         "   Please install yt-dlp using one of the following:\n",
         file=sys.stderr,
     )

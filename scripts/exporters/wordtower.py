@@ -192,7 +192,7 @@ def load_state(path, binding):
     if path.stat().st_size > 65536:
         raise RuntimeError("Invalid recovery file size")
     state = json.loads(path.read_text(encoding="utf-8"))
-    if (state.get("format_version") != "english-craft.wordtower-import.v1" or state.get("connection") != binding
+    if (state.get("format_version") != "lingather.wordtower-import.v1" or state.get("connection") != binding
             or not isinstance(state.get("submit"), dict) or state["submit"].get("api_name") not in {"/imports/text", "/imports/epub"}
             or set(state["submit"]) != {"api_name", "preview_id", "idempotency_key"}
             or not isinstance(state["submit"].get("preview_id"), str)
@@ -260,7 +260,7 @@ def submit_and_poll(script_path, preview_resp, submit_api, env, preview_only=Fal
         if path.exists():
             state = load_state(path, binding)
         else:
-            state = {"format_version": "english-craft.wordtower-import.v1", "connection": binding, "status": "prepared",
+            state = {"format_version": "lingather.wordtower-import.v1", "connection": binding, "status": "prepared",
                      "submit": {"api_name": submit_api, "preview_id": data["preview_id"], "idempotency_key": str(uuid.uuid4())}}
             write_state(path, state)
         return continue_import(script_path, path, state, env, max_wait)

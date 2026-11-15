@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Podcast Search & Zero-Local-ASR Transcript Extractor for EnglishCraft
+Podcast Search & Zero-Local-ASR Transcript Extractor for Lingather
 Searches English podcasts via Apple iTunes API (zero-key), lists episodes with covers
 and durations, and retrieves transcripts without local Whisper/ASR using a 3-tier pipeline:
   Tier 1: RSS <podcast:transcript> tag (when feed is accessible & provides transcript)
@@ -659,7 +659,7 @@ def main():
         else:
             parser.print_help()
     except Exception as exc:
-        print(f"\n❌ [EnglishCraft Podcast] Error: {exc}\n", file=sys.stderr)
+        print(f"\n❌ [Lingather Podcast] Error: {exc}\n", file=sys.stderr)
         sys.exit(1)
 
 

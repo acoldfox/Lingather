@@ -1,10 +1,10 @@
 # 连接词塔
 
-EnglishCraft 获取并整理材料，词塔处理权限、预览、额度、提交与任务状态。词塔是可选输出，不阻断其他功能。现有协议 skill_version 与发布版本号不同，不手动重写官方 config.json。
+Lingather 获取并整理材料，词塔处理权限、预览、额度、提交与任务状态。词塔是可选输出，不阻断其他功能。现有协议 skill_version 与发布版本号不同，不手动重写官方 config.json。
 
 ## 选择连接方式
 
-用户已连接词塔 MCP 时，优先让 Agent 用已发现的 MCP 工具完成业务请求。EnglishCraft 本地仅准备材料，不读取或提取连接器表单 Key。工具名可能有客户端前缀，以实际 schema 为准。
+用户已连接词塔 MCP 时，优先让 Agent 用已发现的 MCP 工具完成业务请求。Lingather 本地仅准备材料，不读取或提取连接器表单 Key。工具名可能有客户端前缀，以实际 schema 为准。
 
 用户安装普通词塔 Skill 时，继续使用 exporters/wordtower.py 的现有一键命令，通过官方 request.py 调用网关；Key 留在本地 WORDTOWER_API_KEY，不放在聊天、命令参数、日志或交接文件中。
 
@@ -32,9 +32,9 @@ python3 {baseDir}/scripts/exporters/wordtower.py epub selected.epub --prepare-on
 
 这三个命令不会读取词塔 Key、调用词塔业务 API、上传或扣额度。输出为官方助手生成的请求参数；--output 拒绝覆盖已有文件。YouTube JSON3 原始 segs/utf8/tOffsetMs 必须保留，不转成 SRT 后再传。
 
-只有视频链接时，可先使用词塔 Skill 的 youtube_subtitles.py 获取单视频自带字幕（Python 标准库，不需 yt-dlp），再交接所得字幕或 preview_request。EnglishCraft 自带频道列表与现有字幕抓取器继续使用 yt-dlp；有 JSON3 就优先保留，无真实词偏移时明确只有片段时间。
+只有视频链接时，可先使用词塔 Skill 的 youtube_subtitles.py 获取单视频自带字幕（Python 标准库，不需 yt-dlp），再交接所得字幕或 preview_request。Lingather 自带频道列表与现有字幕抓取器继续使用 yt-dlp；有 JSON3 就优先保留，无真实词偏移时明确只有片段时间。
 
-也可运行 `fetch_youtube.py wordtower URL --prepare-only --handoff-output video-request.json`，先用 EnglishCraft 下载字幕，再生成参数；这条命令仍需其下载依赖与 YouTube 网络，但不连接词塔或提交课程。
+也可运行 `fetch_youtube.py wordtower URL --prepare-only --handoff-output video-request.json`，先用 Lingather 下载字幕，再生成参数；这条命令仍需其下载依赖与 YouTube 网络，但不连接词塔或提交课程。
 
 Agent 后续步骤：
 
@@ -44,7 +44,7 @@ Agent 后续步骤：
 4. YouTube 回包必须指向相同视频，media_type=youtube、subtitle_count>0；source_url 规范化后按视频 ID 核对。逐词能力以 word_timing_count 为准，不承诺全部字幕都有单词时间。
 5. 用户要求导入且额度足够时，取得报价后继续提交，不额外要求网页批准；仅分析或预览则不提交。提交前保存随机幂等键和预览 ID，未知结果重用原键；取得 job_id 后只查询状态，succeeded 才报告成功。
 
-MCP 请求参数不含 api_name、skill_version、user_id 或 Key。业务 API 名与工具的映射按词塔 MCP 协议，不自行调用 App 内部接口。EnglishCraft 本地恢复文件只覆盖网关导出器；MCP 的请求/任务恢复由执行工具调用的 Agent 保留，不能把两者混用。
+MCP 请求参数不含 api_name、skill_version、user_id 或 Key。业务 API 名与工具的映射按词塔 MCP 协议，不自行调用 App 内部接口。Lingather 本地恢复文件只覆盖网关导出器；MCP 的请求/任务恢复由执行工具调用的 Agent 保留，不能把两者混用。
 
 ## 普通 Skill 一键导入与恢复
 

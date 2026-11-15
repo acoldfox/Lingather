@@ -1,16 +1,18 @@
 ---
-name: english-craft
-description: 英文语料工坊（EnglishCraft）。一站式英文原版语料策展、散装文章装订成册、词汇提炼分析、A4打印排版，并支持一键导入词塔（WordTower）生成双语伴读课程。支持《经济学人》等外刊、Standard Ebooks 与古登堡名著、AudioBook Bay 有声书、英文播客与免本地转录文稿提取、YouTube 英文字幕、外媒网页去噪长文。
+name: lingather
+description: 拾英语（Lingather）。一站式英文原版语料策展、散装文章装订成册、词汇提炼分析、A4打印排版，并支持一键导入词塔（WordTower）生成双语伴读课程。支持《经济学人》等外刊、Standard Ebooks 与古登堡名著、AudioBook Bay 有声书、英文播客与免本地转录文稿提取、YouTube 英文字幕、外媒网页去噪长文。
 metadata:
-  version: "2.3.0"
-  homepage: "https://github.com/acoldfox/english-craft"
+  version: "2.4.0"
+  homepage: "https://github.com/acoldfox/lingather"
 ---
 
-# 英文语料工坊 (EnglishCraft)
+# 拾英语 (Lingather)
 
-**EnglishCraft** 是专为英文原版学习者打造的**个人原版语料策展、装订排印与词汇工坊**。
+用户说「拾英语」或「Lingather」时使用本 Skill，技术标识和显式 Skill 名称为 `lingather`。
 
-它解决了传统英文阅读的三大痛点：**找书难（好源分散）、读懂难（生词零碎未提前梳理）、精读难（散篇无处装订，缺少打印做笔记的排版）**。无论是用于纸质精读、Kindle 墨水屏阅读，还是一键导入**词塔（WordTower）**生成双语伴读课程，EnglishCraft 提供完整的流水线支持。
+**Lingather** 是专为英文原版学习者打造的**个人原版语料策展、装订排印与词汇工坊**。
+
+它解决了传统英文阅读的三大痛点：**找书难（好源分散）、读懂难（生词零碎未提前梳理）、精读难（散篇无处装订，缺少打印做笔记的排版）**。无论是用于纸质精读、Kindle 墨水屏阅读，还是一键导入**词塔（WordTower）**生成双语伴读课程，Lingather 提供完整的流水线支持。
 
 ---
 
@@ -48,7 +50,7 @@ metadata:
 
 > [!NOTE]
 > **关于 Agent 自动安装与审查机制（如 WorkBuddy / Codex）：**
-> EnglishCraft 的装订、词汇和打印等模块使用 Python 标准库；内置 YouTube 列表与字幕抓取器依赖 yt-dlp，网页清洗可使用可选外部 Skill。词塔仅为可选输出，安装阶段不作为阻断依赖。
+> Lingather 的装订、词汇和打印等模块使用 Python 标准库；内置 YouTube 列表与字幕抓取器依赖 yt-dlp，网页清洗可使用可选外部 Skill。词塔仅为可选输出，安装阶段不作为阻断依赖。
 
 在执行相关任务时，Agent 根据用户意图按需自检：
 
@@ -75,7 +77,7 @@ metadata:
 
 ## 📚 第二步：功能模块与脚本调用
 
-> **路径约定**：下方命令中的 `{baseDir}` 代表本 `SKILL.md` 所在的目录（例如 `.agents/skills/english-craft`）。执行脚本时请替换为实际路径。
+> **路径约定**：下方命令中的 `{baseDir}` 代表本 `SKILL.md` 所在的目录（例如 `.agents/skills/lingather`）。执行脚本时请替换为实际路径。
 
 ### 1. 权威外刊下载 (`{baseDir}/scripts/fetch_magazine.py`)
 无需任何外部依赖，自动代理穿透与镜像兜底：

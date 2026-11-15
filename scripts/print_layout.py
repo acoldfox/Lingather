@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Print & Reading Layout Generator for EnglishCraft
+Print & Reading Layout Generator for Lingather
 Generates elegant, print-ready A4 HTML/PDF reading sheets with:
 1. Two-column layout: Main reading text on the left, vocabulary & handwritten note space on the right margin.
 2. End-of-article Vocabulary Checklist with checkboxes for spaced repetition.
@@ -302,12 +302,12 @@ def generate_print_html(input_file, title=None, top_vocab=40, max_paragraphs=60)
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>{html.escape(doc_title)} - EnglishCraft Print Sheet</title>
+    <title>{html.escape(doc_title)} - Lingather Print Sheet</title>
     <style>{A4_PRINT_CSS}</style>
 </head>
 <body>
     <div class="print-tip">
-        💡 <strong>EnglishCraft A4 Print Sheet</strong>: Press <code>Cmd + P</code> (or <code>Ctrl + P</code>) to print or save as PDF. 
+        💡 <strong>Lingather A4 Print Sheet</strong>: Press <code>Cmd + P</code> (or <code>Ctrl + P</code>) to print or save as PDF.
         Margin notes and the end-of-text vocabulary checklist are pre-formatted for intensive paper reading.
     </div>
     <div class="page-container">
@@ -317,7 +317,7 @@ def generate_print_html(input_file, title=None, top_vocab=40, max_paragraphs=60)
             </div>
             <div class="document-meta">
                 Total Words: {stats['total_words']:,} | Target Words: {len(target_vocab_map)}<br>
-                Curated by EnglishCraft
+                Curated by Lingather
             </div>
         </div>
 
@@ -337,7 +337,7 @@ def generate_print_html(input_file, title=None, top_vocab=40, max_paragraphs=60)
     return full_html
 
 def main():
-    parser = argparse.ArgumentParser(description="EnglishCraft A4 Print-Friendly Reading Sheet Generator")
+    parser = argparse.ArgumentParser(description="Lingather A4 Print-Friendly Reading Sheet Generator")
     parser.add_argument("input", help="Path to English EPUB, Markdown, TXT, or SRT file")
     parser.add_argument("--title", "-t", help="Custom document title")
     parser.add_argument("--top-vocab", "-n", type=int, default=40, help="Number of target vocabulary items to track (default: 40)")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AudioBook Bay (ABB) Search & Magnet Extractor for EnglishCraft
+AudioBook Bay (ABB) Search & Magnet Extractor for Lingather
 Searches English audiobooks on AudioBook Bay (audiobookbay.lu and mirror domains),
 extracts narrator/author/format/bitrate metadata, and constructs login-free
 BitTorrent magnet links from the page's Info Hash and tracker list.

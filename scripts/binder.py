@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Article & Chapter Binder for EnglishCraft
+Article & Chapter Binder for Lingather
 Binds multiple scattered English articles (Markdown, TXT, HTML) into a beautifully formatted,
 standard EPUB 3 electronic book or compiled reading digest.
 Zero external dependencies, 100% compliant EPUB packaging.
@@ -139,7 +139,7 @@ def extract_title_and_body(file_path):
 
     return title, content
 
-def create_epub(articles, output_path, book_title="English Reading Digest", author="EnglishCraft"):
+def create_epub(articles, output_path, book_title="English Reading Digest", author="Lingather"):
     """
     Pack multiple articles into a compliant EPUB file.
     articles: list of dicts with {'title': str, 'content': str}
@@ -269,10 +269,10 @@ def create_epub(articles, output_path, book_title="English Reading Digest", auth
     return output_path
 
 def main():
-    parser = argparse.ArgumentParser(description="EnglishCraft Article Binder (Compile articles into EPUB)")
+    parser = argparse.ArgumentParser(description="Lingather Article Binder (Compile articles into EPUB)")
     parser.add_argument("inputs", nargs="+", help="Files or directory containing Markdown / Text articles")
     parser.add_argument("--title", "-t", default="English Reading Digest", help="Book title (default: 'English Reading Digest')")
-    parser.add_argument("--author", "-a", default="EnglishCraft", help="Author name")
+    parser.add_argument("--author", "-a", default="Lingather", help="Author name")
     parser.add_argument("--output", "-o", default="./downloads/digest.epub", help="Output EPUB path (default: ./downloads/digest.epub)")
 
     args = parser.parse_args()
