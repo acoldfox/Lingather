@@ -22,7 +22,8 @@ URL = "https://www.youtube.com/watch?v=pTdvsfIMGes"
 class YouTubeExportTests(unittest.TestCase):
     def test_rejects_plain_text_preview_before_submit(self):
         with tempfile.NamedTemporaryFile(suffix=".srt") as subtitles:
-            with patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
+            with patch.object(exporter, "check_capabilities"), \
+                 patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
                  patch.object(exporter, "find_wordtower_request_script", return_value="request.py"), \
                  patch.object(exporter.subprocess, "run", return_value=SimpleNamespace(
                      returncode=0, stdout=json.dumps({"data": {"preview_id": "plain"}}))), \
@@ -35,16 +36,17 @@ class YouTubeExportTests(unittest.TestCase):
         preview = {"data": {"preview_id": "timed", "media_type": "youtube",
                             "source_url": URL, "subtitle_count": 260}}
         with tempfile.NamedTemporaryFile(suffix=".srt") as subtitles:
-            with patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
+            with patch.object(exporter, "check_capabilities"), \
+                 patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
                  patch.object(exporter, "find_wordtower_request_script", return_value="request.py"), \
                  patch.object(exporter.subprocess, "run", return_value=SimpleNamespace(
                      returncode=0, stdout=json.dumps(preview))) as run, \
                  patch.object(exporter, "submit_and_poll") as submit:
                 exporter.export_youtube(URL, subtitles.name)
                 command = run.call_args.args[0]
-                self.assertEqual(command[2:6], ["--youtube", URL, "--subtitles", subtitles.name])
-                submit.assert_called_once_with("request.py", preview, "/imports/text",
-                                               {"configured": "yes"}, preview_only=False)
+                self.assertEqual(command[2:6], ["--youtube", URL, "--subtitles", str(Path(subtitles.name).resolve())])
+                self.assertEqual(submit.call_args.args, ("request.py", preview, "/imports/text", {"configured": "yes"}))
+                self.assertFalse(submit.call_args.kwargs["preview_only"])
 
     def test_json3_preview_preserves_word_timings(self):
         preview = {"data": {"preview_id": "timed-w", "media_type": "youtube",
@@ -53,7 +55,8 @@ class YouTubeExportTests(unittest.TestCase):
              tempfile.NamedTemporaryFile("w", suffix=".py", encoding="utf-8") as req_script:
             req_script.write("# supports .json3\n")
             req_script.flush()
-            with patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
+            with patch.object(exporter, "check_capabilities"), \
+                 patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
                  patch.object(exporter, "find_wordtower_request_script", return_value=req_script.name), \
                  patch.object(exporter.subprocess, "run", return_value=SimpleNamespace(
                      returncode=0, stdout=json.dumps(preview))) as run, \
@@ -62,17 +65,18 @@ class YouTubeExportTests(unittest.TestCase):
                 command = run.call_args.args[0]
                 self.assertEqual(
                     command[2:8],
-                    ["--youtube", URL, "--subtitles", subtitles.name, "--title", "Doctor Shift"],
+                    ["--youtube", URL, "--subtitles", str(Path(subtitles.name).resolve()), "--title", "Doctor Shift"],
                 )
-                submit.assert_called_once_with(req_script.name, preview, "/imports/text",
-                                               {"configured": "yes"}, preview_only=False)
+                self.assertEqual(submit.call_args.args, (req_script.name, preview, "/imports/text", {"configured": "yes"}))
+                self.assertFalse(submit.call_args.kwargs["preview_only"])
 
     def test_json3_rejects_outdated_request_script(self):
         with tempfile.NamedTemporaryFile(suffix=".json3") as subtitles, \
              tempfile.NamedTemporaryFile("w", suffix=".py", encoding="utf-8") as req_script:
             req_script.write("# legacy 0.7.0 without json3\n")
             req_script.flush()
-            with patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
+            with patch.object(exporter, "check_capabilities"), \
+                 patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
                  patch.object(exporter, "find_wordtower_request_script", return_value=req_script.name):
                 with self.assertRaises(RuntimeError):
                     exporter.export_youtube(URL, subtitles.name)
@@ -86,7 +90,8 @@ class YouTubeExportTests(unittest.TestCase):
     def test_text_path_cannot_import_srt_or_json3(self):
         for suffix in (".srt", ".vtt", ".json3"):
             with tempfile.NamedTemporaryFile(suffix=suffix) as subtitles:
-                with patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
+                with patch.object(exporter, "check_capabilities"), \
+                 patch.object(exporter, "prepare_env", return_value={"configured": "yes"}), \
                      patch.object(exporter, "find_wordtower_request_script", return_value="request.py"), \
                      patch.object(exporter.subprocess, "run") as run:
                     with self.assertRaises(ValueError):
@@ -105,6 +110,26 @@ class FetchYouTubeSubtitleTests(unittest.TestCase):
             url, vid = fetch_youtube.canonical_video_url(raw)
             self.assertEqual(vid, "arrTr-ymaZs")
             self.assertEqual(url, "https://www.youtube.com/watch?v=arrTr-ymaZs")
+
+    def test_invalid_single_video_sources_are_rejected(self):
+        for value in ("https://youtube.com.evil.test/watch?v=arrTr-ymaZs", "https://youtu.be/arrTr-ymaZs/other", "../unsafe"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                fetch_youtube.canonical_video_url(value)
+
+    def test_fetch_command_forwards_mcp_handoff_without_import(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "captions.json3"
+            source.write_text('{"events":[]}')
+            target = Path(temporary) / "handoff.json"
+            with patch.object(fetch_youtube.sys, "argv", ["fetch_youtube.py", "wordtower", URL,
+                    "--prepare-only", "--handoff-output", str(target)]), \
+                 patch.object(fetch_youtube, "download_subtitles_with_meta", return_value=(source, {"video_url": URL})), \
+                 patch.object(fetch_youtube.subprocess, "run") as run:
+                fetch_youtube.main()
+            command = run.call_args.args[0]
+            self.assertIn("--prepare-only", command)
+            self.assertEqual(command[-2:], ["--output", str(target)])
+            self.assertIn("--subtitles", command)
 
     def test_track_selection_prefers_non_translated_native_json3(self):
         metadata = {

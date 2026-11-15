@@ -101,7 +101,7 @@ EnglishCraft 深度集成了 [词塔（WordTower）](https://www.wordtower.cn)�
 - **散篇与网页文章转课程**：
   - *“把刚刚装订好的这本《本周精选》EPUB，一键推送到词塔。”*
   - *“帮我提取这篇外媒长文（https://example.com/article）的正文，直接导入词塔学习。”*
-  *(注：若需导入词塔，首次使用时可在对话框中直接将你的 `WORDTOWER_API_KEY` 发给 AI，Agent 会协助自动配置)*
+  *(词塔为可选输出：已有 MCP 连接可复用工具；普通 Skill 将 WORDTOWER_API_KEY 配置在客户端本地，不在聊天中发送 Key。)*
 
 ---
 
@@ -144,3 +144,12 @@ english-craft/
 ## 📄 License
 
 本项目采用 [MIT License](LICENSE) 开源协议。
+
+## 词塔连接更新
+
+- 当前官方 Skill 安装：`npx skills add word-tower/skills -g`。Claude Code 插件安装可复用同一源码。
+- 已连接 MCP：本地运行导出器的 `--prepare-only --output request.json`，再由 Agent 调词塔工具，保留 JSON3 的真实词时间，不读取 MCP 表单 Key。
+- 普通 Skill：保留现有导入命令，提交前查询实时权限和次数，状态保存在 `.wordtower-imports/`；超时使用 `wordtower.py resume 状态文件`，沿用原幂等键或任务 ID。
+- 词塔协议版本与 Skill 发布版本分开，不手工改 API 配置。当前已加载的官方 Skill 可通过 WORDTOWER_SKILL_DIR 或 --request-script 指定，包括 Claude 插件安装位置。
+
+完整命令、EPUB 上传和恢复边界见[词塔连接与恢复](references/wordtower.md)。

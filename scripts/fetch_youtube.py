@@ -258,34 +258,36 @@ def fetch_channel_videos(
 
 
 def extract_video_id(video_url_or_id: str) -> str | None:
-    """Extract a YouTube video ID from a URL or bare ID."""
+    """Recognize only a single video on an exact YouTube hostname."""
     raw = video_url_or_id.strip()
-    if not raw:
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", raw):
+        return raw
+    try:
+        parsed = urllib.parse.urlsplit(raw)
+        if (parsed.scheme not in {"http", "https"} or parsed.hostname not in {
+                "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+                "youtube-nocookie.com", "www.youtube-nocookie.com"}
+                or parsed.username or parsed.password or parsed.port not in {None, 80, 443}):
+            return None
+        parts = parsed.path.strip("/").split("/")
+        if parsed.hostname == "youtu.be" and len(parts) == 1:
+            identity = parts[0]
+        elif parsed.path == "/watch":
+            identity = urllib.parse.parse_qs(parsed.query).get("v", [""])[0]
+        elif len(parts) == 2 and parts[0] in {"shorts", "embed", "live", "v"}:
+            identity = parts[1]
+        else:
+            return None
+        return identity if re.fullmatch(r"[A-Za-z0-9_-]{11}", identity) else None
+    except ValueError:
         return None
-    if not raw.startswith(("http://", "https://")):
-        return raw if re.fullmatch(r"[A-Za-z0-9_-]{6,}", raw) else None
-
-    parsed = urllib.parse.urlsplit(raw)
-    host = (parsed.hostname or "").lower()
-    if host == "youtu.be":
-        seg = parsed.path.strip("/").split("/")[0]
-        return seg or None
-    if "youtube.com" in host or "youtube-nocookie.com" in host:
-        qs = urllib.parse.parse_qs(parsed.query)
-        if qs.get("v"):
-            return qs["v"][0]
-        parts = [p for p in parsed.path.split("/") if p]
-        if len(parts) >= 2 and parts[0] in {"shorts", "embed", "live", "v"}:
-            return parts[1]
-    return None
 
 
 def canonical_video_url(video_url_or_id: str) -> tuple[str, str]:
-    """Return (canonical watch URL, safe filename ID) for a YouTube video."""
-    vid_id = extract_video_id(video_url_or_id)
-    if vid_id:
-        return f"https://www.youtube.com/watch?v={vid_id}", vid_id
-    return video_url_or_id.strip(), "youtube_sub"
+    identity = extract_video_id(video_url_or_id)
+    if not identity:
+        raise ValueError("Provide one valid YouTube video URL or 11-character ID")
+    return f"https://www.youtube.com/watch?v={identity}", identity
 
 
 def _parse_format_priority(sub_format: str) -> list[str]:
@@ -620,7 +622,11 @@ def main():
         default="json3,vtt,srt",
         help="Subtitle format priority for WordTower import (default: json3,vtt,srt)",
     )
-    wt_parser.add_argument("--preview-only", action="store_true", help="Preview only on WordTower without submit")
+    mode = wt_parser.add_mutually_exclusive_group()
+    mode.add_argument("--preview-only", action="store_true", help="Preview only on WordTower without submit")
+    mode.add_argument("--prepare-only", action="store_true", help="Fetch subtitles then prepare MCP parameters without a WordTower Key")
+    wt_parser.add_argument("--handoff-output", type=Path, help="New JSON file for --prepare-only")
+    wt_parser.add_argument("--state-dir", type=Path, help="WordTower import recovery directory")
     wt_parser.add_argument("--proxy", help="HTTP/HTTPS proxy")
 
     # Support shorthand if no subcommand given: 'fetch_youtube.py @TEDEd'
@@ -667,6 +673,10 @@ def main():
             sys.exit(1)
 
     elif args.subcommand == "wordtower":
+        if args.handoff_output and not args.prepare_only:
+            parser.error("--handoff-output requires --prepare-only")
+        if args.prepare_only and args.state_dir:
+            parser.error("--prepare-only does not accept --state-dir")
         # Prefer JSON3 subtitles so WordTower preserves word-level timestamps when available
         try:
             print(f"📥 Downloading subtitles ({args.format}) for {args.video} ...")
@@ -703,6 +713,12 @@ def main():
         if args.preview_only:
             cmd.append("--preview-only")
 
+        if args.prepare_only:
+            cmd.append("--prepare-only")
+        if args.handoff_output:
+            cmd.extend(["--output", str(args.handoff_output)])
+        if args.state_dir:
+            cmd.extend(["--state-dir", str(args.state_dir)])
         print("🗼 Launching WordTower import pipeline...")
         subprocess.run(cmd, check=True)
 

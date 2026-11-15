@@ -33,3 +33,6 @@ wheels/
 .DS_Store
 Thumbs.db
 .idea/
+
+# WordTower import recovery (no credentials, local tasks only)
+.wordtower-imports/

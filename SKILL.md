@@ -2,7 +2,7 @@
 name: english-craft
 description: 英文语料工坊（EnglishCraft）。一站式英文原版语料策展、散装文章装订成册、词汇提炼分析、A4打印排版，并支持一键导入词塔（WordTower）生成双语伴读课程。支持《经济学人》等外刊、Standard Ebooks 与古登堡名著、AudioBook Bay 有声书、英文播客与免本地转录文稿提取、YouTube 英文字幕、外媒网页去噪长文。
 metadata:
-  version: "2.2.0"
+  version: "2.3.0"
   homepage: "https://github.com/acoldfox/english-craft"
 ---
 
@@ -48,7 +48,7 @@ metadata:
 
 > [!NOTE]
 > **关于 Agent 自动安装与审查机制（如 WorkBuddy / Codex）：**
-> `english-craft` 是一个**完全自包含的纯 Python 原生语料工坊**。核心功能（外刊精选、公版原著、有声书检索、YouTube 视频列表与字幕提取、散篇装订、词频提炼、A4 排版）**均 100% 零外部依赖、开箱即用，安装阶段切勿将词塔作为硬性阻断依赖**。
+> EnglishCraft 的装订、词汇和打印等模块使用 Python 标准库；内置 YouTube 列表与字幕抓取器依赖 yt-dlp，网页清洗可使用可选外部 Skill。词塔仅为可选输出，安装阶段不作为阻断依赖。
 
 在执行相关任务时，Agent 根据用户意图按需自检：
 
@@ -63,7 +63,7 @@ metadata:
        npx skills add https://github.com/word-tower/skills --skill wordtower -y
        ```
      - 用户亦可在 [词塔官网 (www.wordtower.cn)](https://www.wordtower.cn) 进入「账户 → Skill 与 Token」下载官方 ZIP 包解压至 `.agents/skills/wordtower`。
-   - 检查 `WORDTOWER_API_KEY` 是否已配置（格式以 `wtk-` 开头）。若未配置或未安装，其他 7 大语料与排版功能完全不受影响。
+   - 已连接词塔 MCP 时复用当前工具，本地只准备材料，不索取连接表单 Key；普通 Skill 网关方式检查本地 `WORDTOWER_API_KEY`。其他采集、装订和打印功能不依赖词塔。导入前阅读 [词塔连接与恢复](references/wordtower.md)。
 2. **YouTube 提取与字幕依赖（跨平台全自动自愈）**：
    - 模块 `{baseDir}/scripts/fetch_youtube.py` 原生支持 Windows、macOS 与 Linux。
    - 当需要获取 YouTube 视频列表或下载时间戳字幕时，若系统尚未安装 `yt-dlp`，脚本内置**自动自愈机制**（自动触发 `python -m pip install -U yt-dlp` 补齐）。
@@ -177,7 +177,7 @@ python3 {baseDir}/scripts/print_layout.py <path-to-md-or-epub> --title "Article 
 ```
 
 ### 9. 导出到词塔 (`{baseDir}/scripts/exporters/wordtower.py`)
-完整实现词塔官方 `v0.7.3+` 的 `Preview ➔ Submit (UUID 幂等键) ➔ Poll Status` 三步闭环（若用户仅要求预览，可附加 `--preview-only`）：
+复用最新版词塔官方助手，支持实时能力查询、预览、幂等提交和任务恢复。先阅读 [词塔连接与恢复](references/wordtower.md)：已有 MCP 连接时仅本地准备，再由 Agent 调工具；普通 Skill 保留以下网关命令（`--preview-only` 仅预览）：
 ```bash
 # 导出 EPUB（若用户仅需特定章节，先调用 wordtower/scripts/epub_select.py inspect & build 裁剪后再导出）
 python3 {baseDir}/scripts/exporters/wordtower.py epub <path-to-epub> --title "<课程名>"
@@ -243,7 +243,7 @@ python3 {baseDir}/scripts/exporters/wordtower.py youtube "<YouTube-URL>" --subti
 
 ### YouTube 同步字幕导入词塔时的执行约束（仅在用户要求导出到词塔时适用，非安装期要求）
 
-- 视频课程必须使用 `wordtower.py youtube URL --subtitles FILE`，字幕只接受带真实起止时间的 `JSON3`、SRT、VTT 或官方 timed JSON。不得把字幕转 Markdown 后用 `text` 导入，也不得在字幕获取失败时降级成纯文本建课。
+- 视频课程通过 `wordtower.py youtube URL --subtitles FILE`，或由该命令 --prepare-only 后交给词塔 MCP 导入，字幕只接受带真实起止时间的 `JSON3`、SRT、VTT 或官方 timed JSON。不得把字幕转 Markdown 后用 `text` 导入，也不得在字幕获取失败时降级成纯文本建课。
 - 导入词塔时应优先抓取原始 YouTube `json3` 字幕（保留 `events[].segs[].tOffsetMs`），再由新版词塔 `request.py` 直接解析生成单词级时间戳，不得先转成 SRT/VTT 丢弃词偏移。
 - 正文只含字幕，不插入视频标题、简介、总结或翻译；这些内容会破坏字幕与正文的对应关系。标题通过 `--title` 指定（`fetch_youtube.py wordtower` 未指定时默认取原视频标题）。
 - 提交前脚本必须验证服务端预览的 `media_type=youtube`、`source_url` 和正数 `subtitle_count`；不满足即停止，不提交课程。同时根据服务端返回的 `word_timing_count` 如实告知用户是否具备逐词同步（`> 0` 为逐词边界，`0` 为仅段落/句子级时间）。
